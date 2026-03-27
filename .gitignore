@@ -1,0 +1,47 @@
+# 通用忽略规则（数据集、模型、环境等）
+
+# 数据集目录（按项目常见命名）
+dataset/
+
+# 原始/临时数据
+checkpoints/
+dataset_initial/
+
+# 常见的数据文件格式（仅 dataset 文件，保留其他配置 json 文件）
+*.jsonl
+*.jsonl.gz
+*.csv
+*.tsv
+*.parquet
+*.sqlite3
+*.db
+*.pkl
+*.npz
+
+# 模型检查点（如果你想跟踪 checkpoint，请移除这些）
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+checkpoints/
+
+# Python & Jupyter
+__pycache__/
+.ipynb_checkpoints/
+
+# 虚拟环境
+venv/
+env/
+.env
+
+# 编辑器/IDE
+.vscode/
+.idea/
+
+# 日志
+*.log
+
+# 临时文件
+*.tmp
+*.bak
+*~
