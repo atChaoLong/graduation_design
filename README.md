@@ -1,32 +1,16 @@
-# Legal Multi-Label Classifier (BERT + GCN)
+# graduation_design
+我的毕业设计
 
-Quick start
-
-1. Create a Python environment and install dependencies:
-
+# 前端启动
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r legal_classifier/requirements.txt
+cd graduation_design
+conda activate gd
+python -m http.server 8001 --directory d:\work\my\graduation_design\lexmind_frontend
 ```
 
-2. Prepare data as JSONL files (one JSON object per line) with fields: `fact`, `accusation`, `relevant_articles`.
-
-   - `train.json` (training)
-   - `test.json` (validation)
-   - `evaluation.json` (final evaluation)
-3. Run training example:
-
+# 后端启动
 ```bash
-python train.py \
-  --train_path /root/autodl-tmp/dir_jcl/graduation_design/dataset/train_strict20.json \
-  --valid_path /root/autodl-tmp/dir_jcl/graduation_design/dataset/test_strict20.json \
-  --output_dir checkpoints \
-  --epochs 5 \
-  --batch_size 8
+cd graduation_design
+conda activate gd
+python web_app.py
 ```
-
-Notes
-
-- The code uses `bert-base-chinese` by default. You can change the model in `train.py`.
-- Labels (both accusations and law articles) are combined into a single multi-label space, with co-occurrence graph built from `train.json`.
