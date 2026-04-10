@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>LexMind AI — Legal Intelligence Platform</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- NAV / HERO -->
+    <header class="nav">
+      <div class="brand">
+        <div class="logo-glow"></div>
+        <div class="brand-text">LexMind AI</div>
+      </div>
+      <nav>
+        <a href="#demo">Demo</a>
+        <a href="#tech">Technology</a>
+        <a href="#advantages">Why LexMind</a>
+        <a href="#contact" class="cta">Start Predicting</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <canvas id="hero-canvas"></canvas>
+      <div class="hero-content glass">
+        <h1 class="hero-title">Reinventing Legal Intelligence with AI</h1>
+        <p class="hero-sub">Fast, multi-label crime prediction and legal article mapping — production-ready inference for legal teams.</p>
+        <div class="hero-cta">
+          <a href="#demo" class="btn primary">Try Demo</a>
+          <a href="#tech" class="btn ghost">Explore Tech</a>
+        </div>
+        <div class="trust">
+          <span>Powered by Advanced Transformer Models</span>
+          <span>• Trusted by AI Research Engineers</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- DEMO -->
+    <main>
+      <section id="demo" class="demo-section">
+        <div class="demo-left">
+          <div class="panel glass">
+            <h2>Case Facts Input</h2>
+            <textarea id="facts" placeholder="示例：被告于2023年在商店内偷窃...（每条一行）"></textarea>
+            <div class="controls">
+              <label class="small">Threshold
+                <input id="threshold" type="range" min="0" max="1" step="0.01" value="0.5"/>
+                <span id="threshold-val">0.50</span>
+              </label>
+              <div class="action-row">
+                <button id="runBtn" class="btn primary glow">Run Prediction</button>
+                <button id="clearBtn" class="btn ghost">Clear</button>
+              </div>
+            </div>
+            <div id="history" class="history"></div>
+          </div>
+        </div>
+
+        <div class="demo-right">
+          <div class="panel glass" id="resultPanel" aria-live="polite">
+            <div id="loadingArea" class="loading-area hidden">
+              <div class="ai-loader">
+                <div class="orbit"></div>
+                <div class="orbit orbit2"></div>
+                <div class="loader-text">AI thinking...</div>
+              </div>
+              <div class="skeleton-cards">
+                <div class="skeleton-card"></div>
+                <div class="skeleton-card short"></div>
+                <div class="skeleton-card"></div>
+              </div>
+            </div>
+
+            <div id="outputArea" class="output-area hidden">
+              <h3>Prediction Results</h3>
+              <div id="charges" class="cards"></div>
+              <h4>Predicted Articles</h4>
+              <div id="articles" class="articles"></div>
+            </div>
+
+            <div id="emptyNotice" class="empty">Run prediction to see results</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TECH SHOWCASE -->
+      <section id="tech" class="tech-section">
+        <h2>Core Technologies</h2>
+        <div class="tech-grid">
+          <div class="tech-card glass tech-graph">
+            <div class="chip">BERT</div>
+            <div class="desc">Transformer-based contextual embeddings for legal text.</div>
+            <div class="neural-art"></div>
+          </div>
+          <div class="tech-card glass">
+            <div class="chip">Attention</div>
+            <div class="desc">Multi-head attention to capture long-range dependencies.</div>
+            <div class="neural-lines"></div>
+          </div>
+          <div class="tech-card glass">
+            <div class="chip">Multi-label</div>
+            <div class="desc">Tailored loss & graph constraints for multiple charges.</div>
+            <div class="mini-graph"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ADVANTAGES -->
+      <section id="advantages" class="advantages">
+        <h2>Why LexMind</h2>
+        <div class="adv-grid">
+          <div class="adv card glass">
+            <div class="adv-title">High Accuracy</div>
+            <div class="bar" data-value="92"><div class="bar-fill"></div></div>
+            <div class="adv-note">Validated on held-out legal datasets</div>
+          </div>
+          <div class="adv card glass">
+            <div class="adv-title">Multi-label Support</div>
+            <div class="bar" data-value="86"><div class="bar-fill"></div></div>
+            <div class="adv-note">Simultaneous charge & article prediction</div>
+          </div>
+          <div class="adv card glass">
+            <div class="adv-title">Real-time Inference</div>
+            <div class="bar" data-value="98"><div class="bar-fill"></div></div>
+            <div class="adv-note">Optimized for latency-sensitive workflows</div>
+          </div>
+        </div>
+      </section>
+
+      <footer id="contact" class="footer">
+        <div>© <strong>LexMind AI</strong> — AI Legal Intelligence Platform</div>
+        <div>Built with attention to privacy & enterprise readiness</div>
+      </footer>
+    </main>
+  </div>
+
+  <script type="module" src="components.js"></script>
+  <script type="module" src="utils.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

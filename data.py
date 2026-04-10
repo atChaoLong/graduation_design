@@ -21,19 +21,15 @@ class LegalJSONLDataset(Dataset):
         inputs = self.tokenizer(fact, truncation=True, padding='max_length', max_length=self.max_length, return_tensors='pt')
         labels = np.zeros(len(self.label2idx), dtype=np.float32)
         # 修复后的标签填充逻辑
-        # support multiple data formats: top-level or inside meta
         acc = s.get('accusation', [])
-        if (not acc) and isinstance(s.get('meta'), dict):
-            acc = s['meta'].get('accusation', [])
         if isinstance(acc, str):
             acc = [acc]
         for a in acc:
             key = f'accusation::{a}' # 必须加前缀
             if key in self.label2idx:
                 labels[self.label2idx[key]] = 1.0
+
         rel = s.get('relevant_articles', [])
-        if (not rel) and isinstance(s.get('meta'), dict):
-            rel = s['meta'].get('relevant_articles', [])
         if isinstance(rel, (str, int)):
             rel = [str(rel)]
         for r in rel:
@@ -41,9 +37,19 @@ class LegalJSONLDataset(Dataset):
             if key in self.label2idx:
                 labels[self.label2idx[key]] = 1.0
 
-        # use normalized acc/rel (which may come from meta) for downstream display
-        orig_acc = [str(x) for x in (acc or [])]
-        orig_rel = [str(x) for x in (rel or [])]
+        # normalize originals for easier downstream display
+        orig_acc = []
+        if isinstance(s.get('accusation', []), str):
+            orig_acc = [s.get('accusation')]
+        else:
+            acc_field = s.get('accusation', []) or []
+            orig_acc = list(acc_field)
+
+        rel_field = s.get('relevant_articles', [])
+        if isinstance(rel_field, (str, int)):
+            orig_rel = [str(rel_field)]
+        else:
+            orig_rel = [str(x) for x in (rel_field or [])]
 
         item = {
             'input_ids': inputs['input_ids'].squeeze(0),
@@ -61,15 +67,11 @@ def build_label_space(train_path):
     labels = []
     for s in load_jsonl(train_path):
         acc = s.get('accusation', [])
-        if (not acc) and isinstance(s.get('meta'), dict):
-            acc = s['meta'].get('accusation', [])
         if isinstance(acc, str):
             acc = [acc]
         for a in acc:
             labels.append(f'accusation::{a}')
         rel = s.get('relevant_articles', [])
-        if (not rel) and isinstance(s.get('meta'), dict):
-            rel = s['meta'].get('relevant_articles', [])
         if isinstance(rel, (str,int)):
             rel = [str(rel)]
         for r in rel:
@@ -85,8 +87,6 @@ def build_label_cooccurrence(train_path, label2idx):
     for s in load_jsonl(train_path):
         labs = []
         acc = s.get('accusation', [])
-        if (not acc) and isinstance(s.get('meta'), dict):
-            acc = s['meta'].get('accusation', [])
         if isinstance(acc, str):
             acc = [acc]
         for a in acc:
@@ -94,8 +94,6 @@ def build_label_cooccurrence(train_path, label2idx):
             if key in label2idx:
                 labs.append(label2idx[key])
         rel = s.get('relevant_articles', [])
-        if (not rel) and isinstance(s.get('meta'), dict):
-            rel = s['meta'].get('relevant_articles', [])
         if isinstance(rel, (str,int)):
             rel = [str(rel)]
         for r in rel:
