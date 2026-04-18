@@ -14,6 +14,7 @@ from tqdm import tqdm
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import seaborn as sns
 from sklearn.metrics import multilabel_confusion_matrix
 from data import LegalJSONLDataset, build_label_space, build_label_cooccurrence
@@ -32,6 +33,79 @@ def compute_metrics(y_true, y_pred):
     else:
         acc = (y_true == y_pred).all(axis=1).mean()
     return micro, macro, acc
+
+
+def plot_confusion_matrix(confusion, classes, title, save_path):
+    """Plot and save a confusion matrix with the style from the user's example."""
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    cax = ax.matshow(confusion.cpu().numpy())
+    fig.colorbar(cax)
+
+    # Set up axes
+    ax.set_xticks(np.arange(len(classes)), labels=classes, rotation=90)
+    ax.set_yticks(np.arange(len(classes)), labels=classes)
+
+    # Force label at every tick
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+    ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
+
+    ax.set_xlabel('Predicted')
+    ax.set_ylabel('True')
+    ax.set_title(title)
+
+    plt.tight_layout()
+    fig.savefig(save_path)
+    plt.close(fig)
+
+
+def build_label_confusion_matrices(y_true, y_pred, acc_indices, article_indices, acc_classes, article_classes):
+    """
+    Build confusion matrices for accusations and articles separately.
+    For multi-label: each sample can contribute to multiple cells (one per true label and one per predicted label).
+    We normalize by row (true label distribution).
+    Returns (acc_confusion, article_confusion)
+    """
+    import torch
+    # accusations confusion matrix
+    acc_confusion = torch.zeros(len(acc_classes), len(acc_classes))
+    # articles confusion matrix
+    article_confusion = torch.zeros(len(article_classes), len(article_classes))
+
+    # Extract only accusation columns and article columns
+    y_true_acc = y_true[:, acc_indices]
+    y_pred_acc = y_pred[:, acc_indices]
+    y_true_art = y_true[:, article_indices]
+    y_pred_art = y_pred[:, article_indices]
+
+    # For each sample, add counts
+    for i in range(y_true.shape[0]):
+        # accusations: for each true=1 and pred=1, increment confusion[t][p]
+        true_acc_idx = np.where(y_true_acc[i] == 1)[0]
+        pred_acc_idx = np.where(y_pred_acc[i] == 1)[0]
+        for t in true_acc_idx:
+            for p in pred_acc_idx:
+                acc_confusion[t][p] += 1
+
+        # articles
+        true_art_idx = np.where(y_true_art[i] == 1)[0]
+        pred_art_idx = np.where(y_pred_art[i] == 1)[0]
+        for t in true_art_idx:
+            for p in pred_art_idx:
+                article_confusion[t][p] += 1
+
+    # Normalize by dividing every row by its sum
+    for i in range(len(acc_classes)):
+        denom = acc_confusion[i].sum()
+        if denom > 0:
+            acc_confusion[i] = acc_confusion[i] / denom
+
+    for i in range(len(article_classes)):
+        denom = article_confusion[i].sum()
+        if denom > 0:
+            article_confusion[i] = article_confusion[i] / denom
+
+    return acc_confusion, article_confusion
 
 
 def collate_fn(batch):
@@ -71,6 +145,29 @@ def train(args):
     valid_ds = LegalJSONLDataset(args.valid_path, label2idx, max_length=args.max_length)
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
     valid_loader = DataLoader(valid_ds, batch_size=args.batch_size, shuffle=False, collate_fn=collate_fn)
+
+    # Extract accusation and article indices and class names
+    acc_indices = []
+    article_indices = []
+    acc_classes = []
+    article_classes = []
+    for label, idx in label2idx.items():
+        if label.startswith('accusation::'):
+            acc_indices.append(idx)
+            acc_classes.append(label.split('::', 1)[1])
+        elif label.startswith('article::'):
+            article_indices.append(idx)
+            article_classes.append(label.split('::', 1)[1])
+    # Sort by index to maintain consistent order
+    acc_order = np.argsort(acc_indices)
+    acc_indices = [acc_indices[i] for i in acc_order]
+    acc_classes = [acc_classes[i] for i in acc_order]
+    article_order = np.argsort(article_indices)
+    article_indices = [article_indices[i] for i in article_order]
+    article_classes = [article_classes[i] for i in article_order]
+    logger.info(f'Number of accusation classes: {len(acc_classes)}')
+    logger.info(f'Accusation classes: {acc_classes}')
+    logger.info(f'Number of article classes: {len(article_classes)}')
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = BertGCNForMultiLabel(bert_model=args.bert_model, num_labels=num_labels, label_dim=args.label_dim)
@@ -229,6 +326,28 @@ def train(args):
                 plt.close(fig3)
         except Exception:
             pass
+
+        # --- 罪名混淆矩阵（8x8）和法条混淆矩阵（动态大小） ---
+        try:
+            if y_true.size > 0 and len(acc_indices) > 0 and len(article_indices) > 0:
+                acc_confusion, article_confusion = build_label_confusion_matrices(
+                    y_true, y_pred, acc_indices, article_indices, acc_classes, article_classes)
+
+                # 罪名混淆矩阵
+                if len(acc_classes) > 0:
+                    acc_cm_path = run_dir / f'confusion_matrix_accusation_epoch{epoch}.png'
+                    plot_confusion_matrix(acc_confusion, acc_classes,
+                                          f'Accusation Confusion Matrix (Epoch {epoch})',
+                                          acc_cm_path)
+
+                # 法条混淆矩阵
+                if len(article_classes) > 0:
+                    art_cm_path = run_dir / f'confusion_matrix_article_epoch{epoch}.png'
+                    plot_confusion_matrix(article_confusion, article_classes,
+                                          f'Article Confusion Matrix (Epoch {epoch})',
+                                          art_cm_path)
+        except Exception as e:
+            logger.warning(f'Failed to plot confusion matrices: {e}')
 
         logger.info(f'Epoch {epoch}: Loss={epoch_loss:.4f} Micro-F1={micro:.4f} Macro-F1={macro:.4f} Acc={val_acc:.4f}')
 
