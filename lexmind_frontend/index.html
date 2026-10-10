@@ -1,144 +1,329 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>LexMind AI — Legal Intelligence Platform</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LexMind AI - 司法文本智能分析系统</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app">
-    <!-- NAV / HERO -->
-    <header class="nav">
-      <div class="brand">
-        <div class="logo-glow"></div>
-        <div class="brand-text">LexMind AI</div>
+  <!-- 导航栏 -->
+  <nav class="nav">
+    <a href="/" class="nav-brand">
+      <div class="nav-logo">L</div>
+      <span class="nav-title">LexMind AI</span>
+    </a>
+    <div class="nav-links">
+      <a href="/" class="nav-link active">首页</a>
+      <a href="/pages/articles.html" class="nav-link">博客</a>
+      <a href="/pages/predict.html" id="predictLink" class="nav-link hidden">开始预测</a>
+      <a href="/pages/profile.html" id="profileLink" class="nav-link hidden">个人中心</a>
+      <a href="/pages/login.html" id="loginLink" class="btn btn-primary btn-sm">登录</a>
+      <button id="logoutBtn" class="btn btn-secondary btn-sm hidden">退出</button>
+    </div>
+  </nav>
+
+  <!-- Hero区域 -->
+  <section class="hero-section">
+    <div class="container">
+      <div class="hero-content">
+        <h1 class="hero-title">LexMind AI</h1>
+        <p class="hero-subtitle">基于深度学习的司法文本智能分析系统</p>
+        <p class="hero-desc">融合BERT预训练模型与图卷积网络，实现高准确率的多罪名预测</p>
+        <div class="hero-btns">
+          <a href="/pages/predict.html" class="btn btn-primary btn-lg">立即体验</a>
+          <a href="/pages/articles.html" class="btn btn-secondary btn-lg">了解更多</a>
+        </div>
       </div>
-      <nav>
-        <a href="#demo">Demo</a>
-        <a href="#tech">Technology</a>
-        <a href="#advantages">Why LexMind</a>
-        <a href="#contact" class="cta">Start Predicting</a>
-      </nav>
-    </header>
+    </div>
+  </section>
 
-    <section class="hero">
-      <canvas id="hero-canvas"></canvas>
-      <div class="hero-content glass">
-        <h1 class="hero-title">Reinventing Legal Intelligence with AI</h1>
-        <p class="hero-sub">Fast, multi-label crime prediction and legal article mapping — production-ready inference for legal teams.</p>
-        <div class="hero-cta">
-          <a href="#demo" class="btn primary">Try Demo</a>
-          <a href="#tech" class="btn ghost">Explore Tech</a>
+  <!-- 功能介绍 -->
+  <section class="features-section">
+    <div class="container">
+      <h2 class="section-title">核心功能</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">⚖️</div>
+          <h3>多罪名预测</h3>
+          <p>基于深度学习模型，自动识别刑事案件涉及的多个罪名</p>
         </div>
-        <div class="trust">
-          <span>Powered by Advanced Transformer Models</span>
-          <span>• Trusted by AI Research Engineers</span>
+        <div class="feature-card">
+          <div class="feature-icon">📚</div>
+          <h3>法条推荐</h3>
+          <p>根据案件事实智能推荐适用的法律条文</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔬</div>
+          <h3>模型先进</h3>
+          <p>融合BERT与GCN，充分建模文本语义与罪名关联</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>效果优异</h3>
+          <p>Micro-F1达97.6%，Macro-F1达95.2%</p>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- DEMO -->
-    <main>
-      <section id="demo" class="demo-section">
-        <div class="demo-left">
-          <div class="panel glass">
-            <h2>Case Facts Input</h2>
-            <textarea id="facts" placeholder="示例：被告于2023年在商店内偷窃...（每条一行）"></textarea>
-            <div class="controls">
-              <label class="small">Threshold
-                <input id="threshold" type="range" min="0" max="1" step="0.01" value="0.5"/>
-                <span id="threshold-val">0.50</span>
-              </label>
-              <div class="action-row">
-                <button id="runBtn" class="btn primary glow">Run Prediction</button>
-                <button id="clearBtn" class="btn ghost">Clear</button>
-              </div>
-            </div>
-            <div id="history" class="history"></div>
-          </div>
+  <!-- 预测入口 -->
+  <section class="predict-entry-section">
+    <div class="container">
+      <div class="predict-entry-card">
+        <h2>开始智能分析</h2>
+        <p>输入案件事实描述，获取AI辅助预测结果</p>
+        <a href="/pages/predict.html" class="btn btn-primary btn-lg">进入预测</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 页脚 -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <span class="nav-title">LexMind AI</span>
+          <p>司法文本智能分析系统</p>
         </div>
-
-        <div class="demo-right">
-          <div class="panel glass" id="resultPanel" aria-live="polite">
-            <div id="loadingArea" class="loading-area hidden">
-              <div class="ai-loader">
-                <div class="orbit"></div>
-                <div class="orbit orbit2"></div>
-                <div class="loader-text">AI thinking...</div>
-              </div>
-              <div class="skeleton-cards">
-                <div class="skeleton-card"></div>
-                <div class="skeleton-card short"></div>
-                <div class="skeleton-card"></div>
-              </div>
-            </div>
-
-            <div id="outputArea" class="output-area hidden">
-              <h3>Prediction Results</h3>
-              <div id="charges" class="cards"></div>
-              <h4>Predicted Articles</h4>
-              <div id="articles" class="articles"></div>
-            </div>
-
-            <div id="emptyNotice" class="empty">Run prediction to see results</div>
-          </div>
+        <div class="footer-links">
+          <a href="/pages/articles.html">博客文章</a>
+          <a href="/pages/login.html">用户登录</a>
         </div>
-      </section>
+      </div>
+      <div class="footer-copy">
+        &copy; 2024 LexMind AI. 基于深度学习的司法辅助研究
+      </div>
+    </div>
+  </footer>
 
-      <!-- TECH SHOWCASE -->
-      <section id="tech" class="tech-section">
-        <h2>Core Technologies</h2>
-        <div class="tech-grid">
-          <div class="tech-card glass tech-graph">
-            <div class="chip">BERT</div>
-            <div class="desc">Transformer-based contextual embeddings for legal text.</div>
-            <div class="neural-art"></div>
-          </div>
-          <div class="tech-card glass">
-            <div class="chip">Attention</div>
-            <div class="desc">Multi-head attention to capture long-range dependencies.</div>
-            <div class="neural-lines"></div>
-          </div>
-          <div class="tech-card glass">
-            <div class="chip">Multi-label</div>
-            <div class="desc">Tailored loss & graph constraints for multiple charges.</div>
-            <div class="mini-graph"></div>
-          </div>
-        </div>
-      </section>
+  <style>
+    /* Hero区域 */
+    .hero-section {
+      background: linear-gradient(135deg, #1a73e8 0%, #00a8ff 100%);
+      padding: 80px 0;
+      color: white;
+    }
 
-      <!-- ADVANTAGES -->
-      <section id="advantages" class="advantages">
-        <h2>Why LexMind</h2>
-        <div class="adv-grid">
-          <div class="adv card glass">
-            <div class="adv-title">High Accuracy</div>
-            <div class="bar" data-value="92"><div class="bar-fill"></div></div>
-            <div class="adv-note">Validated on held-out legal datasets</div>
-          </div>
-          <div class="adv card glass">
-            <div class="adv-title">Multi-label Support</div>
-            <div class="bar" data-value="86"><div class="bar-fill"></div></div>
-            <div class="adv-note">Simultaneous charge & article prediction</div>
-          </div>
-          <div class="adv card glass">
-            <div class="adv-title">Real-time Inference</div>
-            <div class="bar" data-value="98"><div class="bar-fill"></div></div>
-            <div class="adv-note">Optimized for latency-sensitive workflows</div>
-          </div>
-        </div>
-      </section>
+    .hero-content {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto;
+    }
 
-      <footer id="contact" class="footer">
-        <div>© <strong>LexMind AI</strong> — AI Legal Intelligence Platform</div>
-        <div>Built with attention to privacy & enterprise readiness</div>
-      </footer>
-    </main>
-  </div>
+    .hero-title {
+      font-size: 48px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      letter-spacing: -1px;
+    }
 
-  <script type="module" src="components.js"></script>
-  <script type="module" src="utils.js"></script>
-  <script type="module" src="app.js"></script>
+    .hero-subtitle {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      opacity: 0.95;
+    }
+
+    .hero-desc {
+      font-size: 16px;
+      margin-bottom: 32px;
+      opacity: 0.9;
+    }
+
+    .hero-btns {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+    }
+
+    .hero-btns .btn-secondary {
+      background: rgba(255,255,255,0.15);
+      border: 2px solid white;
+      color: white;
+    }
+
+    .hero-btns .btn-secondary:hover {
+      background: rgba(255,255,255,0.25);
+    }
+
+    /* 功能区 */
+    .features-section {
+      padding: 80px 0;
+      background: var(--background);
+    }
+
+    .section-title {
+      font-size: 28px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 48px;
+      color: var(--text-primary);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 32px 24px;
+      text-align: center;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.3s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .feature-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .feature-card h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-primary);
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    /* 预测入口 */
+    .predict-entry-section {
+      padding: 80px 0;
+      background: var(--surface);
+    }
+
+    .predict-entry-card {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      border-radius: var(--radius-lg);
+      padding: 60px;
+      text-align: center;
+      color: white;
+    }
+
+    .predict-entry-card h2 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    .predict-entry-card p {
+      font-size: 16px;
+      margin-bottom: 24px;
+      opacity: 0.9;
+    }
+
+    .predict-entry-card .btn-primary {
+      background: white;
+      color: var(--primary);
+    }
+
+    .predict-entry-card .btn-primary:hover {
+      background: var(--background);
+    }
+
+    /* 页脚 */
+    .footer {
+      background: var(--text-primary);
+      color: white;
+      padding: 40px 0 20px;
+    }
+
+    .footer-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .footer-brand .nav-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: white;
+    }
+
+    .footer-brand p {
+      font-size: 14px;
+      opacity: 0.7;
+      margin-top: 4px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer-links a {
+      color: white;
+      text-decoration: none;
+      opacity: 0.8;
+      font-size: 14px;
+    }
+
+    .footer-links a:hover {
+      opacity: 1;
+    }
+
+    .footer-copy {
+      text-align: center;
+      font-size: 12px;
+      opacity: 0.5;
+    }
+
+    /* 响应式 */
+    @media (max-width: 768px) {
+      .hero-title { font-size: 32px; }
+      .hero-subtitle { font-size: 18px; }
+      .features-grid { grid-template-columns: 1fr 1fr; }
+      .footer-content { flex-direction: column; gap: 16px; }
+    }
+
+    @media (max-width: 480px) {
+      .features-grid { grid-template-columns: 1fr; }
+      .hero-btns { flex-direction: column; }
+    }
+  </style>
+
+  <script>
+    // 检查登录状态
+    function checkAuth() {
+      const token = localStorage.getItem('lexmind_token');
+      const user = JSON.parse(localStorage.getItem('lexmind_user') || 'null');
+
+      if (token && user) {
+        document.getElementById('profileLink').classList.remove('hidden');
+        document.getElementById('loginLink').classList.add('hidden');
+        document.getElementById('logoutBtn').classList.remove('hidden');
+      } else {
+        document.getElementById('profileLink').classList.add('hidden');
+        document.getElementById('loginLink').classList.remove('hidden');
+        document.getElementById('logoutBtn').classList.add('hidden');
+      }
+    }
+
+    // 退出登录
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem('lexmind_token');
+      localStorage.removeItem('lexmind_user');
+      checkAuth();
+    });
+
+    // 初始化
+    checkAuth();
+  </script>
 </body>
 </html>

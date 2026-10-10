@@ -36,7 +36,7 @@ class BiLSTMForMultiLabel(nn.Module):
         # Output layer: hidden_dim * 2 (bidirectional)
         self.fc = nn.Linear(hidden_dim * 2, num_labels)
 
-    def forward(self, input_ids):
+    def forward(self, input_ids, attention_mask=None):
         # input_ids: (batch, seq_len)
         batch_size = input_ids.size(0)
 

@@ -144,7 +144,14 @@ def train(args):
     if args.model == 'bert_gcn':
         adj = adj.to(device)
 
-    optimizer = AdamW(model.parameters(), lr=args.lr)
+    # BERT models need lower lr to preserve pretrained weights
+    # CNN/LSTM train from scratch, can use higher lr
+    if args.model in ('bert', 'bert_gcn'):
+        # Lower lr for BERT: 1e-5 is standard for fine-tuning
+        bert_lr = min(args.lr, 1e-5)
+        optimizer = AdamW(model.parameters(), lr=bert_lr)
+    else:
+        optimizer = AdamW(model.parameters(), lr=args.lr)
     criterion = get_criterion(args)
 
     best_micro = 0.0
@@ -181,6 +188,11 @@ def train(args):
 
             loss = criterion(logits, labels)
             loss.backward()
+
+            # Gradient clipping for BERT models to prevent exploding gradients
+            if args.model in ('bert', 'bert_gcn'):
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
             optimizer.step()
 
             running_loss += loss.item() * input_ids.size(0)

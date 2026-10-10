@@ -2,7 +2,12 @@
 
 # 数据集目录（按项目常见命名）
 dataset/
-
+./claude
+external_models/
+final_documents/
+lexmind_frontend/pages/
+paper_imgs/
+test_cases.txt
 # 原始/临时数据
 checkpoints/
 dataset_initial/

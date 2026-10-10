@@ -1,234 +1,196 @@
+"""
+LexMind AI - 司法文本智能分析系统
+主应用入口 - Flask + SQLite + JWT认证
+"""
 import os
-from flask import Flask, request, render_template_string, jsonify
-import torch
-import numpy as np
-from transformers import AutoTokenizer
-from model import BertGCNForMultiLabel
+import json
+from flask import Flask, request, jsonify, send_from_directory
+from functools import wraps
+
+# 设置Hugging Face模型下载路径（避免下载到C盘）
+MODEL_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'external_models')
+os.environ['HF_HOME'] = MODEL_CACHE_DIR
+os.environ.setdefault('HF_ENDPOINT', 'https://hf-mirror.com')
+
+# 初始化数据库
+from database import init_db, get_db
+from auth import register_api as register_auth_routes
+from blog_routes import register_blog_routes
 
 app = Flask(__name__, static_folder='lexmind_frontend', static_url_path='')
+app.config['SECRET_KEY'] = 'lexmind-legal-ai-secret-key-2024'
 
-# Config (can be overridden via env vars)
-CHECKPOINT_PATH = r"D:\\work\\my\\graduation_design\\checkpoints\\best_model.pt"
-BERT_MODEL = 'bert-base-chinese'
-THRESHOLD = '0.5'
-DEVICE = torch.device('cuda' if (torch.cuda.is_available() and os.environ.get('DEVICE','')!='cpu') else 'cpu')
-MAX_LENGTH = int('256')
+# CORS跨域支持
+@app.after_request
+def cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return response
 
-# load checkpo`int
-if not os.path.exists(CHECKPOINT_PATH):
-    print(f"Warning: checkpoint {CHECKPOINT_PATH} not found. Start server but predictions will fail until a checkpoint exists.")
-    checkpoint = None
-else:
-    checkpoint = torch.load(CHECKPOINT_PATH, map_location='cpu')
+# 处理OPTIONS预检请求
+@app.route('/<path:path>', methods=['OPTIONS'])
+@app.route('/api/<path:path>', methods=['OPTIONS'])
+def options_handler(path=None):
+    return '', 200
 
-# load label mapping
-if checkpoint is not None and 'label2idx' in checkpoint:
-    label2idx = checkpoint['label2idx']
-else:
-    label2idx = {}
+# 初始化数据库
+init_db()
 
-idx2label = {v: k for k, v in label2idx.items()} if label2idx else {}
-num_labels = len(label2idx)
+# 注册路由
+register_auth_routes(app)
+register_blog_routes(app)
 
-# initialize model
-if num_labels > 0:
-    model = BertGCNForMultiLabel(bert_model=BERT_MODEL, num_labels=num_labels)
-    if checkpoint is not None and 'model_state' in checkpoint:
+# ==================== 预测API ====================
+
+# 预测服务（懒加载）
+prediction_service = None
+
+def get_prediction_service():
+    global prediction_service
+    if prediction_service is None:
+        from transformers import AutoTokenizer
+        import torch
+        torch.set_num_threads(os.cpu_count() or 4)
+        from model import BertGCNForMultiLabel
+
+        DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        CHECKPOINT_PATH = os.path.join(os.path.dirname(__file__), 'checkpoints', 'best_model.pt')
+        BERT_MODEL = 'bert-base-chinese'
+        MAX_LENGTH = 256
+
+        if not os.path.exists(CHECKPOINT_PATH):
+            raise FileNotFoundError(f"模型文件未找到: {CHECKPOINT_PATH}")
+
+        checkpoint = torch.load(CHECKPOINT_PATH, map_location=DEVICE)
+        label2idx = checkpoint.get('label2idx', {})
+        idx2label = {v: k for k, v in label2idx.items()}
+        num_labels = len(label2idx)
+
+        model = BertGCNForMultiLabel(bert_model=BERT_MODEL, num_labels=num_labels)
         model.load_state_dict(checkpoint['model_state'])
-    model.to(DEVICE)
-    model.eval()
-else:
-    model = None
+        model.to(DEVICE)
+        model.eval()
 
-# tokenizer
-tokenizer = AutoTokenizer.from_pretrained(BERT_MODEL)
+        tokenizer = AutoTokenizer.from_pretrained(BERT_MODEL)
 
-HTML = '''
-<!doctype html>
-<html lang="zh-CN">
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>罪名&法条 识别</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-<div class="container py-5">
-    <div class="card shadow-sm">
-        <div class="card-body">
-            <h3 class="card-title">法律事实识别</h3>
-            <p class="text-muted">在下方文本框输入一条或多条事实，每条新行表示一个样本。系统将根据模型直接输出的最高置信度结果进行返回。</p>
-            <form method="post" action="/predict">
-                <div class="mb-3">
-                    <textarea name="facts" class="form-control" rows="8" placeholder="每行一条事实"></textarea>
-                </div>
-                <button class="btn btn-primary">开始识别</button>
-            </form>
-        </div>
-    </div>
+        class PredictionService:
+            def __init__(self):
+                self.model = model
+                self.tokenizer = tokenizer
+                self.device = DEVICE
+                self.idx2label = idx2label
+                self.num_labels = num_labels
+                self.max_length = MAX_LENGTH
+                # 预计算identity矩阵，避免每次推理重建
+                self._eye_cache = torch.eye(self.num_labels, device=self.device)
 
-    {% if results %}
-    <div class="mt-4">
-        <h4>预测结果</h4>
-        <div class="row">
-            {% for r in results %}
-            <div class="col-md-6">
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <p class="card-text"><strong>Fact</strong>: {{r.fact}}</p>
-                        <p class="card-text"><strong>Predicted Accusation</strong>: {{r.pred_accusation}}</p>
-                        <p class="card-text"><strong>Predicted Article</strong>: {{r.pred_article}}</p>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    {% endif %}
-</div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
-'''
+            def predict(self, facts, threshold=0.5):
+                enc = self.tokenizer(
+                    facts,
+                    truncation=True,
+                    padding='max_length',
+                    max_length=self.max_length,
+                    return_tensors='pt'
+                )
+                input_ids = enc['input_ids'].to(self.device)
+                attention_mask = enc['attention_mask'].to(self.device)
+                adj = self._eye_cache
 
+                with torch.inference_mode():
+                    logits = self.model(input_ids=input_ids, attention_mask=attention_mask, adj=adj)
+                    probs = torch.sigmoid(logits).cpu().numpy()
 
-@app.route('/', methods=['GET'])
-def index():
-    # serve the frontend index (static)
-    try:
-        return app.send_static_file('index.html')
-    except Exception:
-        return render_template_string(HTML, results=None)
+                max_conf = [0.0] * self.num_labels
+                for row in probs:
+                    for i, v in enumerate(row):
+                        if v > max_conf[i]:
+                            max_conf[i] = float(v)
 
+                charges = []
+                for idx, conf in enumerate(max_conf):
+                    if conf >= threshold:
+                        name = self.idx2label.get(idx, f'label_{idx}')
+                        charges.append({'name': name, 'confidence': conf})
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    if model is None:
-        return "Model not loaded. Place a valid checkpoint at {}".format(CHECKPOINT_PATH), 500
+                return sorted(charges, key=lambda x: x['confidence'], reverse=True)
 
-    facts_raw = request.form.get('facts','').strip()
-    if not facts_raw:
-        return render_template_string(HTML, results=[])
+        prediction_service = PredictionService()
 
-    facts = [f.strip() for f in facts_raw.splitlines() if f.strip()]
+    return prediction_service
 
-    # tokenize
-    enc = tokenizer(facts, truncation=True, padding='max_length', max_length=MAX_LENGTH, return_tensors='pt')
-    input_ids = enc['input_ids'].to(DEVICE)
-    attention_mask = enc['attention_mask'].to(DEVICE)
-
-    # build adjacency as identity (if you have cooccurrence matrix, you can build a better adj)
-    adj = torch.eye(num_labels, device=DEVICE)
-
-    with torch.no_grad():
-        logits = model(input_ids=input_ids, attention_mask=attention_mask, adj=adj)
-        probs = torch.sigmoid(logits).cpu().numpy()
-
-    # prepare label index groups
-    acc_indices = [i for i, lab in idx2label.items() if lab.startswith('accusation::')]
-    art_indices = [i for i, lab in idx2label.items() if lab.startswith('article::')]
-
-    results = []
-    for i, p in enumerate(probs):
-        pred_acc = ''
-        pred_art = ''
-        # pick the highest-prob accusation (single-label decision)
-        if acc_indices:
-            acc_probs = p[acc_indices]
-            acc_choice = int(acc_indices[np.argmax(acc_probs)])
-            pred_acc = idx2label.get(acc_choice, '')
-        # pick the highest-prob article (single best article)
-        if art_indices:
-            art_probs = p[art_indices]
-            art_choice = int(art_indices[np.argmax(art_probs)])
-            pred_art = idx2label.get(art_choice, '')
-
-        results.append({'fact': facts[i], 'pred_accusation': pred_acc, 'pred_article': pred_art})
-
-    return render_template_string(HTML, results=results)
-
-
-# API endpoint for frontend to call with JSON
 @app.route('/api/predict', methods=['POST'])
-def api_predict():
-    data = request.get_json(force=True)
-    facts = data.get('facts') if isinstance(data.get('facts'), list) else []
-    threshold = float(data.get('threshold', THRESHOLD))
+def predict():
+    """罪名预测API"""
+    try:
+        data = request.get_json()
+        facts = data.get('facts', [])
+        threshold = float(data.get('threshold', 0.5))
 
-    if not facts:
-        return jsonify({"charges": [], "articles": []})
+        if not facts:
+            return jsonify({'charges': [], 'articles': []})
 
-    # If model is loaded, use it; otherwise fall back to simple keyword heuristic
-    if model is not None and num_labels > 0:
-        try:
-            enc = tokenizer(facts, truncation=True, padding='max_length', max_length=MAX_LENGTH, return_tensors='pt')
-            input_ids = enc['input_ids'].to(DEVICE)
-            attention_mask = enc['attention_mask'].to(DEVICE)
-            adj = torch.eye(num_labels, device=DEVICE)
-            with torch.no_grad():
-                logits = model(input_ids=input_ids, attention_mask=attention_mask, adj=adj)
-                probs = torch.sigmoid(logits).cpu().numpy()
+        if isinstance(facts, str):
+            facts = [facts]
 
-            # aggregate confidences across samples by taking max per label
-            max_conf = [0.0] * num_labels
-            for row in probs:
-                for i, v in enumerate(row):
-                    if v > max_conf[i]:
-                        max_conf[i] = float(v)
+        service = get_prediction_service()
+        charges = service.predict(facts, threshold)
 
-            charges = []
-            articles = {}
-            for idx, conf in enumerate(max_conf):
-                if conf >= 0.0:
-                    name = idx2label.get(idx, f'label_{idx}')
-                    # if label encodes article as 'article::id::desc' try to parse
-                    if isinstance(name, str) and name.startswith('article::'):
-                        parts = name.split('::')
-                        aid = parts[1] if len(parts) > 1 else parts[-1]
-                        desc = parts[2] if len(parts) > 2 else ''
-                        articles[aid] = {'id': aid, 'desc': desc}
-                    charges.append({'name': name, 'confidence': conf})
+        # 保存预测记录（如果已登录）
+        auth_header = request.headers.get('Authorization', '')
+        if auth_header.startswith('Bearer '):
+            from auth import decode_token
+            from database import save_prediction, get_user_by_id
+            token = auth_header[7:]
+            user_id = decode_token(token)
+            if user_id:
+                user = get_user_by_id(user_id)
+                if user:
+                    input_text = '\n'.join(facts)
+                    save_prediction(user_id, input_text, charges, threshold)
 
-            # sort charges by confidence desc and filter by threshold
-            charges = sorted(charges, key=lambda x: x['confidence'], reverse=True)
-            charges = [c for c in charges if c['confidence'] >= threshold]
-            return jsonify({"charges": charges, "articles": list(articles.values())})
-        except Exception as e:
-            print('Error during model inference:', e)
-            return jsonify({"error": str(e)}), 500
-    else:
-        # simple fallback heuristic (keyword-based)
-        mapping = [
-            (['偷','盗'], '盗窃罪', {'id':'264','desc':'盗窃罪相关法条'}),
-            (['抢','抢劫'], '抢劫罪', {'id':'263','desc':'抢劫罪相关法条'}),
-            (['诈骗','骗'], '诈骗罪', {'id':'266','desc':'诈骗罪相关法条'}),
-            (['故意伤害','伤害'], '故意伤害罪', {'id':'234','desc':'故意伤害相关法条'}),
-        ]
-        charges_map = {}
-        articles_map = {}
-        import math
-        for f in facts:
-            lf = f.lower()
-            for kws, name, art in mapping:
-                for kw in kws:
-                    if kw in lf:
-                        prev = charges_map.get(name, 0.0)
-                        # synthetic confidence
-                        conf = min(0.99, 0.6 + min(0.35, lf.count(kw)*0.12) + min(0.25, math.log1p(len(f))/20))
-                        charges_map[name] = max(prev, conf)
-                        articles_map[art['id']] = art
+        return jsonify({'charges': charges, 'articles': []})
 
-        if not charges_map:
-            # fallback pick
-            name = '盗窃罪'
-            charges_map[name] = 0.6
+    except FileNotFoundError as e:
+        return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        return jsonify({'error': f'预测出错: {str(e)}'}), 500
 
-        charges = [{'name': k, 'confidence': v} for k, v in charges_map.items()]
-        charges = sorted(charges, key=lambda x: x['confidence'], reverse=True)
-        charges = [c for c in charges if c['confidence'] >= threshold]
-        return jsonify({"charges": charges, "articles": list(articles_map.values())})
+@app.route('/api/model/status', methods=['GET'])
+def model_status():
+    """获取模型状态"""
+    try:
+        service = get_prediction_service()
+        return jsonify({'status': 'ready', 'model': 'BERT-GCN'})
+    except FileNotFoundError:
+        return jsonify({'status': 'not_loaded', 'model': 'BERT-GCN'})
+
+# ==================== 静态文件服务 ====================
+
+@app.route('/')
+def index():
+    return send_from_directory('lexmind_frontend', 'index.html')
+
+@app.route('/pages/<path:filename>')
+def serve_pages(filename):
+    return send_from_directory('lexmind_frontend/pages', filename)
+
+@app.route('/api/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('lexmind_frontend', filename)
+
+# ==================== 健康检查 ====================
+
+@app.route('/api/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'ok', 'service': 'LexMind AI'})
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    print("=" * 50)
+    print("LexMind AI - 司法文本智能分析系统")
+    print("=" * 50)
+    print("后端服务启动中...")
+    print("访问 http://localhost:5000 使用系统")
+    print("=" * 50)
+    app.run(host='0.0.0.0', port=5000, debug=True)

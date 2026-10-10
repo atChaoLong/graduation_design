@@ -32,7 +32,7 @@ class TextCNNForMultiLabel(nn.Module):
         # Output layer
         self.fc = nn.Linear(len(filter_sizes) * num_filters, num_labels)
 
-    def forward(self, input_ids):
+    def forward(self, input_ids, attention_mask=None):
         # input_ids: (batch, seq_len)
         batch_size = input_ids.size(0)
 

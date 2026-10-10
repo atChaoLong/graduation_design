@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(python *)",
+      "Bash(where python *)",
+      "Read(//mnt/c/Users/14531/Anaconda3/envs/gd/**)",
+      "Read(//c/Users/14531/Anaconda3/envs/gd/**)"
+    ]
+  }
+}
